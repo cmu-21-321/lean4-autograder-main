@@ -56,6 +56,8 @@ def comparatorBinary : FilePath :=
   ".lake" / "packages" / "comparator" / ".lake" / "build" / "bin" / "comparator"
 def lean4exportBinary : FilePath :=
   ".lake" / "packages" / "lean4export" / ".lake" / "build" / "bin" / "lean4export"
+def fakeLandrunScript : FilePath :=
+  ".lake" / "packages" / "comparator" / "scripts" / "fake-landrun.sh"
 
 def comparatorPinChallengeFile (i : Nat) : FilePath := comparatorLibDir / s!"Challenge{i}.lean"
 def comparatorPinChallengeModule (i : Nat) : String := s!"{comparatorLibDirName}.Challenge{i}"
@@ -279,9 +281,63 @@ def writeComparatorPin (i : Nat) (t : PinTarget) (tacticBlock : String) : IO Uni
   IO.FS.writeFile (comparatorPinChallengeFile i) t.challengeContent
   IO.FS.writeFile (comparatorPinFile i) (t.solutionContent tacticBlock)
 
+/-- Set once, at the top of `main`, from `cfg.localRun`. Read by
+`resolveLocalLandrunFallback` below; see its doc comment for why this is a ref rather
+than a parameter threaded through the whole call chain down to `runComparator`. -/
+initialize localRunRef : IO.Ref Bool ← IO.mkRef false
+
+/-- Whether a landrun-compatible binary is resolvable right now: either
+`COMPARATOR_LANDRUN` is already set (Comparator will use it directly, whatever it
+points to -- an explicit choice we never override), or a bare `landrun` resolves via
+`PATH`. -/
+def landrunIsResolvable : IO Bool := do
+  if (← IO.getEnv "COMPARATOR_LANDRUN").isSome then
+    return true
+  try
+    let out ← IO.Process.output { cmd := "landrun", args := #["--version"] }
+    return out.exitCode == 0
+  catch _ => return false
+
+/-- Whether `resolveLocalLandrunFallback` has already printed its warning this run, so
+it only prints once (it's otherwise called once per Comparator invocation, i.e. once
+per exercise). -/
+initialize landrunFallbackWarnedRef : IO.Ref Bool ← IO.mkRef false
+
+/-- In `--local` mode only -- never during a real Gradescope run, where `setup.sh`
+guarantees a real, sandboxing `landrun` is on `PATH`, and where silently degrading
+sandboxing would be a serious problem, not a convenience -- fall back to Comparator's
+own `scripts/fake-landrun.sh` dev shim (which provides NO sandboxing at all) when
+neither `COMPARATOR_LANDRUN` nor a bare `landrun` resolves. This exists so `lake exe
+autograder --local ...` works out of the box for course staff iterating on a stencil,
+who would otherwise see every single exercise fail with a misleading "could not be
+built" message and no indication that the actual problem is an unrelated missing
+binary. Returns the env override to hand to `runComparator`, if any; prints a loud
+warning the first time it activates. -/
+def resolveLocalLandrunFallback : IO (Array (String × Option String)) := do
+  if !(← localRunRef.get) then return #[]
+  if ← landrunIsResolvable then return #[]
+  let alreadyWarned ← landrunFallbackWarnedRef.get
+  landrunFallbackWarnedRef.set true
+  if ← fakeLandrunScript.pathExists then
+    if !alreadyWarned then
+      IO.println <| "WARNING: `landrun` was not found on PATH and COMPARATOR_LANDRUN is "
+        ++ "not set. Falling back to Comparator's scripts/fake-landrun.sh dev shim for "
+        ++ "this --local run, which provides NO SANDBOXING. This is fine for locally "
+        ++ "testing your own stencil/submission files, but must never be relied on to "
+        ++ "grade an untrusted submission -- install a real `landrun` (or point "
+        ++ "COMPARATOR_LANDRUN at one) for that."
+    return #[("COMPARATOR_LANDRUN", some fakeLandrunScript.toString)]
+  else
+    if !alreadyWarned then
+      IO.println <| "WARNING: `landrun` was not found on PATH, COMPARATOR_LANDRUN is "
+        ++ "not set, and Comparator's dev shim isn't available either (expected at "
+        ++ s!"{fakeLandrunScript}). Comparator will fail to run."
+    return #[]
+
 def comparatorRunEnv : IO (Array (String × Option String)) := do
   let lean4export ← IO.FS.realPath lean4exportBinary
-  return #[("COMPARATOR_LEAN4EXPORT", some lean4export.toString)]
+  let landrunFallback ← resolveLocalLandrunFallback
+  return #[("COMPARATOR_LEAN4EXPORT", some lean4export.toString)] ++ landrunFallback
 
 /-- Runs `comparator` on `cfg` and returns whether it succeeded, plus a log of its
 output for debugging/instructor info. -/
@@ -659,6 +715,7 @@ def parseArgs : List String → IO ConfigData :=
 
 unsafe def main (args : List String) : IO Unit := do
   let cfg ← parseArgs args
+  localRunRef.set cfg.localRun
 
   -- Get files into their appropriate locations
   let (studentFileName, output) ← moveFilesIntoPlace cfg.localSubmission
