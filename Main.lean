@@ -288,6 +288,67 @@ def runComparator (cfg : ComparatorConfig) : IO (Bool × String) := do
   }
   return (out.exitCode == 0, out.stdout ++ "\n" ++ out.stderr)
 
+/-- Coarse categorization of why Comparator rejected a submission, derived by pattern
+matching against its own diagnostic output (`Comparator/Compare.lean`,
+`Comparator/Axioms.lean`, `Main.lean` in the pinned Comparator version). This is a
+best-effort enrichment of the student-facing message, never a correctness dependency:
+Comparator's exact wording is an internal implementation detail that could change in a
+future version, and any log that doesn't match a known pattern always falls back to
+`.unknown`, which reproduces today's generic message. -/
+inductive ComparatorFailureReason
+  | usesSorry
+  | illegalAxiom (axiomName : String)
+  | wrongStatement
+  | kernelRejected
+  | buildFailed
+  | unknown
+
+/-- Pulls the axiom name out of Comparator's `Illegal axiom detected: 'name'` message. -/
+def extractIllegalAxiomName (log : String) : Option String := do
+  let parts := log.splitOn "Illegal axiom detected: '"
+  let rest ← parts[1]?
+  let name := (rest.splitOn "'").headD ""
+  if name.isEmpty then none else some name
+
+def classifyComparatorFailure (log : String) : ComparatorFailureReason :=
+  if let some axiomName := extractIllegalAxiomName log then
+    if axiomName == "sorryAx" then .usesSorry else .illegalAxiom axiomName
+  else if #["theorem statement do not match", "constant kind don't match",
+      "does not match between challenge and target", "is not a theorem",
+      "is not a definition"].any (fun needle => (log.splitOn needle).length > 1) then
+    .wrongStatement
+  else if (log.splitOn "Child exited with").length > 1 then
+    .buildFailed
+  else if (log.splitOn "Running Lean default kernel on solution").length > 1
+      && (log.splitOn "Lean default kernel accepts the solution").length == 1 then
+    .kernelRejected
+  else
+    .unknown
+
+def proofFailureMessage : ComparatorFailureReason → String
+  | .usesSorry => "Your proof is missing or incomplete (it appears to use `sorry`)."
+  | .illegalAxiom ax =>
+    s!"Your proof relies on the axiom `{ax}`, which isn't permitted for this exercise."
+  | .wrongStatement => "Your proof does not prove the expected statement for this exercise."
+  | .kernelRejected => "Your proof was rejected by an independent kernel check."
+  | .buildFailed => "Your submission could not be built for independent verification; "
+      ++ "please check it for compile errors."
+  | .unknown => "Comparator could not verify this proof. This usually means the proof is "
+      ++ "missing, uses `sorry`, uses an axiom that isn't permitted, or doesn't prove the "
+      ++ "expected statement."
+
+def defFailureMessage : ComparatorFailureReason → String
+  | .usesSorry => "Your definition could not be proven equal to the reference solution."
+  | .illegalAxiom ax =>
+    s!"Proving your definition equal to the reference solution relies on the axiom `{ax}`, "
+      ++ "which isn't permitted for this exercise."
+  | .wrongStatement => "Your definition's type does not match the expected type for this exercise."
+  | .kernelRejected => "The proof that your definition equals the reference solution was "
+      ++ "rejected by an independent kernel check."
+  | .buildFailed => "Your submission could not be built for independent verification; "
+      ++ "please check it for compile errors."
+  | .unknown => "Comparator could not verify this definition against the reference solution."
+
 /-- Verifies a proof exercise via Comparator. `challenge_module` is the sheet itself,
 unmodified (its theorem statement -- `sorry`'d or not, Comparator never inspects the
 proof body -- is the trusted reference); `solution_module` is the submission (or, in
@@ -309,9 +370,7 @@ def verifyProofViaComparator (name subName : Name) (pts : Float)
              output_log := s!"Verified by Comparator\n{log}" }
   else
     return { name := subName, score := 0.0, status := "failed",
-             output := "Comparator could not verify this proof. This usually means "
-               ++ "the proof is missing, uses `sorry`, uses an axiom that isn't "
-               ++ "permitted, or doesn't prove the expected statement.",
+             output := proofFailureMessage (classifyComparatorFailure log),
              sheet_name := name, expected_status := "none",
              output_log := s!"Comparator rejected the proof\n{log}" }
 
@@ -336,8 +395,7 @@ def verifyDefViaComparator (i : Nat) (t : PinTarget) (pts : Float)
              output_log := s!"Verified equal to reference by Comparator\n{log}" }
   else
     return { name := t.subName, score := 0.0, status := "failed",
-             output := "Comparator could not verify this definition against the "
-               ++ "reference solution.",
+             output := defFailureMessage (classifyComparatorFailure log),
              sheet_name := t.refName, expected_status := "none",
              output_log := s!"Comparator rejected the definition\n{log}" }
 
