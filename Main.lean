@@ -147,6 +147,7 @@ def escapeHtml (s : String) :=
 
 -- Throw error and show it to the student, optionally providing additional
 -- information for the instructor only
+-- TODO this fails with --local if ../results doesn't exist
 def exitWithError {α} (errMsg : String) (instructorInfo: String := "")
   : IO α := do
   let result : FailureResult := {output := errMsg}
