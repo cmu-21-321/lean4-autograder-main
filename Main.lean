@@ -202,10 +202,17 @@ def writeComparatorRef (sheetContents : String) : IO Unit := do
       ++ body ++ "\n\nend " ++ comparatorReferenceNamespace ++ "\n"
 
 /-- Writes `ComparatorGrading/Solution.lean`: whatever is being graded (submission or
-`--test` fixture), verbatim. -/
+`--test` fixture), verbatim -- deliberately *not* importing `ComparatorGrading.Ref`.
+Solution.lean never itself references `ComparatorReference.*` (only `PinN.lean` does,
+and it already imports `Ref` directly); importing it here anyway would leak the sheet's
+own `notation`/`macro` declarations into the submission's scope, since those aren't
+namespace-scoped the way ordinary declarations are -- even though `Ref.lean` wraps the
+sheet in `namespace ComparatorReference`. A submission that (legitimately or
+maliciously) redeclares the same notation would then collide with the sheet's own
+copy, breaking the whole shared file instead of just the one exercise. -/
 def writeComparatorSolution (bodyContents : String) : IO Unit := do
   IO.FS.createDirAll comparatorLibDir
-  IO.FS.writeFile comparatorSolutionFile <| s!"import {comparatorRefModule}\n\n" ++ bodyContents
+  IO.FS.writeFile comparatorSolutionFile bodyContents
 
 /-- One "pin" obligation: verify that `subName` (as it appears in whatever is being
 graded -- the submission, or a `--test` candidate) is provably equal to the sheet's
