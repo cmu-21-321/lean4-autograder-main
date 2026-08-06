@@ -45,6 +45,13 @@ For example, the autograder would award 1 point for a proof of `th1`.
 theorem th3 (h : ¬q → ¬p) : (p → q) := sorry
 ```
 
+You can specify the axioms allowed in a solution by using the `validAxioms` attribute:
+```lean 
+@[autogradedProof 1, validAxioms #[Quot.sound, propext, funext]]
+theorem EM_of_DN_good : (∀ p : Prop, ¬¬p → p) → (∀ p : Prop, p ∨ ¬p) :=
+  sorry
+```
+
 `@[autogradedDef pts]` is used for functions, propositions, and instances.
 The correct definition of the theorem is needed in the solution file.
 The autograder will try to prove that the student's definition is equal to the solution definition using `Eq.refl`, `HEq.refl`, and various tactics.
