@@ -4,6 +4,14 @@ This project provides a Lean 4 autograder that works with [Gradescope](https://g
 It checks that students have provided proof terms with the correct type or have created equal `Expr`s up to definitional equality. 
 The autograder can check theorems, functions, propositions, and instances. It *cannot* grade inductive types or structures.
 
+Grading verdicts are independently verified using [Comparator](https://github.com/leanprover/comparator): rather than trusting
+its own in-process elaboration of a submission, the autograder rebuilds the relevant declarations in a sandboxed subprocess
+(via [landrun](https://github.com/Zouuup/landrun)), re-serializes them through `lean4export`, and replays them through the
+Lean kernel. To run the autograder locally (`--local`/`--test`), `landrun` and `lean4export` must be available -- either on
+`PATH`, or pointed to via the `COMPARATOR_LANDRUN`/`COMPARATOR_LEAN4EXPORT` environment variables. For local development
+without a real sandbox, Comparator's own `scripts/fake-landrun.sh` shim can stand in for `landrun` (no sandboxing, so don't
+use it against untrusted submissions).
+
 ## Setup 
 
 More detailed instructions can be found in the [Lean autograder shell](https://github.com/robertylewis/lean4_autograder), but here is a brief overview.
