@@ -1,4 +1,4 @@
-# Lean 4 Autograder
+# Lean 4 Gradescope Autograder
 
 This project provides a Lean 4 autograder that works with [Gradescope](https://gradescope-autograders.readthedocs.io/en/latest/). 
 It checks that students have provided proof terms with the correct type or have created equal `Expr`s up to definitional equality. 
@@ -18,7 +18,8 @@ More detailed instructions can be found in the [Lean autograder shell](https://g
 
 First, set up a course repository on GitHub. Add this project, autograder-main, as a lake dependency. 
 Then, use [autograder shell](https://github.com/robertylewis/lean4_autograder) to create the zip file that actually gets uploaded to Gradescope.
-This project is meant to work with MathLib assignments, so for a good Gradescope performance, their container must have at least 2.0 CPU and 3.0GB RAM. 
+This project is meant to work with MathLib assignments, so for a good Gradescope performance, their container must have at least 2.0 CPU and 3.0GB RAM,
+and preferably the maximum resources allowed by Gradescope.
 Otherwise, you'll get inscrutable errors when it runs out of memory. 
 After this is all set up, students will only need to submit a file to Gradescope.
 
@@ -31,29 +32,38 @@ Students would then submit *only* their `Homework1.lean` file to Gradescope.
 
 ## Autograding 
 
-The two main attributes are `@[autogradedProof pts]` and `@[autogradedDef pts]`.
+The primary feature of the current autograder checks that *proofs* are complete. 
+An experimental feature checks the correctness of definitions.
 
-`@[autogradedProof pts]` is used for theorems. 
-It checks that the student has provided a `sorry`-free proof of the theorem that does not use any nonstandard axioms.
-Extra axioms can be allowed with the `@[legalAxiom]` attribute.
-Note that the solution file needs the theorem statement, but does not need a proof of the theorem.
+### Checking proofs
 
-For example, the autograder would award 1 point for a proof of `th1`.
+The attribute `@[autogradedProof pts]` is used to denote exercises where the student should complete a proof of a theorem statement provided by the instructor.
+The autograder awards `pts` number of points if the student's proof is complete.
+The solution/stencil file needs the theorem statement, but does not need a reference proof of the theorem.
 
+For example, suppose that the stencil distributed to students contains the following code:
 ```lean
 @[autogradedProof 1]
 theorem th3 (h : ¬q → ¬p) : (p → q) := sorry
 ```
+If a student submits an assignment that replaces `sorry` with a valid proof, the autograder will grant one point.
 
-You can specify the axioms allowed in a solution by using the `validAxioms` attribute:
+By default, the autograder allows all and only the axioms defined in Lean core.
+Extra axioms can be allowed globally by tagging the axiom with the `@[legalAxiom]` attribute.
+You can locally specify the axioms allowed in a solution by using the `validAxioms` attribute on that problem.
+The autograder will only award points for the following if a student's solution does not use `Classical.choice`:
 ```lean 
 @[autogradedProof 1, validAxioms #[Quot.sound, propext, funext]]
 theorem EM_of_DN_good : (∀ p : Prop, ¬¬p → p) → (∀ p : Prop, p ∨ ¬p) :=
   sorry
 ```
 
-`@[autogradedDef pts]` is used for functions, propositions, and instances.
-The correct definition of the theorem is needed in the solution file.
+### Checking definitions
+
+**This feature is experimental.** It should not be relied on yet.
+
+The attribute `@[autogradedDef pts]` applies to functions, propositions, and instances, i.e. declarations whose type is not a `Prop`.
+The correct declaration body must be provided in the solution file.
 The autograder will try to prove that the student's definition is equal to the solution definition using `Eq.refl`, `HEq.refl`, and various tactics.
 A default list of tactics for the assignment can be set using `@[defaultTactics #[]]` over the `setDefaultTactics` function.
 Individual problems can override the default list of tactics using the `@[validTactics #[]]` attribute. 
@@ -73,18 +83,21 @@ def reverse {α : Type} : List α → List α
 
 ## Testing the Autograder
 
-To test the autograder locally, build the project and run the autograder with the `--local` flag.
+To run the autograder locally, build the project and run the autograder with the `--local` flag.
 This will print the results of the autograder to the console instead of producing a JSON file.
 
 ```lean
 lake exe autograder --local path/to/submission.lean path/to/solutions.lean
 ```
 
+### Building a test suite
+
+More comprehensive testing can be desirable especially during assignment development.
 To test the autograder, build the project and run the autograder with the `--test` flag.
 This will check the submission sheet for the `[@autograderTest status name]` attribute.
 
 The `autograderTest` attribute is used to test multiple possible submissions to a problem
-without editing the master solutions file. The `status` paramenter is the expected status 
+without editing the master solutions file. The `status` parameter is the expected status 
 of the test and should either be `passes` or `fails`. The `name` parameter is the name of 
 the problem in the solutions files. 
 
