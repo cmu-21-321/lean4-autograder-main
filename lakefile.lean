@@ -3,7 +3,7 @@ open Lake DSL
 
 package autograder
 
-require comparator from git "https://github.com/leanprover/comparator" @ "v4.33.0-rc2"
+require comparator from git "https://github.com/leanprover/comparator" @ "v4.33.0"
 
 lean_lib AutograderTests where
   globs := #[.submodules `AutograderTests]
