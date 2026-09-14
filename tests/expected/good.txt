@@ -5,5 +5,6 @@ instReprBoolTF	passed	1
 myId	passed	1
 p_and_comm	passed	1
 p_em	passed	1
+p_ext	passed	1
 p_nn	passed	1
 p_or_comm	passed	2.5

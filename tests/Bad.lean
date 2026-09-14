@@ -18,6 +18,11 @@ theorem p_or_comm (p q : Prop) (h : p ∨ q) : q ∨ p := sorry
 theorem p_nn (p : Prop) (h : p) : ¬¬p :=
   fun hn => (Classical.em p).elim (fun _ => hn h) (fun np => np h)
 
+-- Correct, but routed through `Classical.choice`, which `p_ext`'s `validAxioms`
+-- omits: must be rejected even though `propext` and `funext` are permitted.
+theorem p_ext (f g : Nat → Prop) (h : ∀ n, f n ↔ g n) : f = g :=
+  Classical.byContradiction fun hne => hne (funext fun n => propext (h n))
+
 -- Control: classical is permitted here, must still pass.
 theorem p_em (p : Prop) : p ∨ ¬p := Classical.em p
 
