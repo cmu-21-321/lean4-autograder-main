@@ -130,3 +130,30 @@ def reverse3 {α : Type} : List α → List α
   | List.nil        => List.nil
   | List.cons x xs  => List.append [x] (reverse3 xs)
 ```
+
+## Continuous integration
+
+`lake build` only builds the `autograder` executable. It does not build the
+`comparator`/`lean4export` binaries that grading shells out to at runtime, and it
+does not run a grading pass, so it can stay green while grading is broken --
+after a toolchain bump, for instance. `tests/run_tests.sh` covers that gap:
+
+```bash
+tests/run_tests.sh
+```
+
+It checks that `comparator` and `lean4export` are pinned to the same toolchain
+this project uses, builds them, grades a deliberately-correct and a
+deliberately-wrong fixture submission against `tests/Sheet.lean` (diffing the
+per-exercise verdicts against `tests/expected/`), checks that `@[validTactics]`
+text reaches the generated pin theorems, and runs `--test` mode over
+`tests/Tests.lean`. `.github/workflows/ci.yml` runs it on every push and pull
+request.
+
+When bumping `lean-toolchain`, bump the `require comparator ... @ "<tag>"` line
+in `lakefile.lean` to the matching Comparator tag in the same commit and re-run
+`lake update comparator`; the test suite fails if the two drift apart.
+
+Because no `landrun` binary is installed on the CI runner, the suite runs with
+Comparator's `scripts/fake-landrun.sh` shim: it exercises the grading pipeline,
+not the sandbox.

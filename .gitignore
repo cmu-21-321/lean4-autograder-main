@@ -3,3 +3,9 @@
 /lake-packages
 /.cache
 .DS_Store
+
+# Scratch files written by a grading run (`lake exe autograder`)
+/Assignment.lean
+/config.json
+/ComparatorGrading/
+/AutograderTests/Solution.lean

@@ -1,0 +1,57 @@
+name: CI
+
+# `lake build` on its own is not enough to tell us the autograder still works:
+# the default target is just the `autograder` executable, so it never builds the
+# `comparator`/`lean4export` binaries that grading shells out to at runtime, and
+# it never runs a grading pass. A toolchain bump can therefore leave `lake build`
+# green while grading is broken. `tests/run_tests.sh` builds the full runtime
+# dependency set and grades fixture submissions end to end.
+
+on:
+  push:
+    branches:
+      - 'main'
+      - 'master'
+  pull_request:
+    branches:
+      - 'main'
+      - 'master'
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: Build and grade fixture submissions
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@v4
+
+      - name: Install Lean and build the default target
+        uses: leanprover/lean-action@v1
+        with:
+          build: true
+          test: false
+          lint: false
+
+      # Grades a correct and an incorrect fixture submission against a fixture
+      # sheet and diffs the verdicts against tests/expected/, runs `--test` mode,
+      # and checks that the pinned dependencies match our lean-toolchain.
+      #
+      # No `landrun` is installed on the runner, so `--local` mode falls back to
+      # Comparator's `scripts/fake-landrun.sh` dev shim: this job exercises the
+      # grading pipeline, not the sandbox.
+      - name: Run the autograder end-to-end test suite
+        run: ./tests/run_tests.sh
+
+      - name: Upload grading logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: autograder-logs
+          path: .lake/test-*.log
+          if-no-files-found: ignore

@@ -1,0 +1,9 @@
+IsEven	failed	0
+dbl	failed	0
+dbl2	failed	0
+instReprBoolTF	failed	0
+myId	passed	1
+p_and_comm	passed	1
+p_em	passed	1
+p_nn	failed	0
+p_or_comm	failed	0

@@ -1,0 +1,9 @@
+IsEven	passed	1
+dbl	passed	1
+dbl2	passed	1
+instReprBoolTF	passed	1
+myId	passed	1
+p_and_comm	passed	1
+p_em	passed	1
+p_nn	passed	1
+p_or_comm	passed	2.5
