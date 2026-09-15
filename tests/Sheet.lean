@@ -32,6 +32,17 @@ theorem p_or_comm (p q : Prop) (h : p ∨ q) : q ∨ p := sorry
 @[autogradedProof 1, validAxioms #[Quot.sound, propext, funext]]
 theorem p_nn (p : Prop) (h : p) : ¬¬p := sorry
 
+/-- Exercises `@[validAxioms]` in the *positive* direction. `validAxioms` replaces
+`defaultValidAxioms` outright rather than narrowing it, so the reference proof
+below is accepted only if the listed names survive `AutograderLib`'s
+`Syntax`-to-`Name` parsing and the round-trip through Comparator's JSON config; a
+garbled name would reject a correct proof.
+
+`Quot.sound` has to be listed even though the proof never mentions it: `funext` is
+a *theorem* in Lean core, not an axiom, and it is derived from `Quot.sound`. -/
+@[autogradedProof 1, validAxioms #[Quot.sound, propext, funext]]
+theorem p_ext (f g : Nat → Prop) (h : ∀ n, f n ↔ g n) : f = g := sorry
+
 /-- No `validAxioms`, so `defaultValidAxioms` applies and `Classical.choice` is fine. -/
 @[autogradedProof 1]
 theorem p_em (p : Prop) : p ∨ ¬p := sorry

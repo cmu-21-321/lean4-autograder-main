@@ -9,6 +9,9 @@ theorem p_or_comm (p q : Prop) (h : p ∨ q) : q ∨ p := h.elim Or.inr Or.inl
 
 theorem p_nn (p : Prop) (h : p) : ¬¬p := fun hn => hn h
 
+theorem p_ext (f g : Nat → Prop) (h : ∀ n, f n ↔ g n) : f = g :=
+  funext fun n => propext (h n)
+
 theorem p_em (p : Prop) : p ∨ ¬p := Classical.em p
 
 def dbl (n : Nat) : Nat := n + n
